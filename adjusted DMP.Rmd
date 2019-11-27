@@ -1,0 +1,45 @@
+
+
+```{r}
+# load in packages
+library(dplyr) 
+library(tidyr) 
+library(ChAMP) 
+library(tibble)
+library(ChAMPdata)
+library(limma)
+data(probe.features.epic)
+cpg.info = probe.features %>% rownames_to_column("CpG")
+
+select <- dplyr::select; rename <- dplyr::rename; mutate <- dplyr::mutate; 
+summarize <- dplyr::summarize; arrange <- dplyr::arrange; filter <- dplyr::filter; slice <- dplyr::slice
+
+# make fake data for demographics dataset
+demographics_data = data.frame(Sample_Name = paste0("Sample",1:20), 
+                               Sample_Group = sample(c("Normal","Tumor"),size=20,replace=TRUE),
+                               age = round(rnorm(20,45,5),0),
+                               race = sample(c("White","African American"),size=20,replace=TRUE))
+
+# make fake data for beta matrix 
+myNorm = matrix(sample(seq(0.01,1,by=0.001),20*20,replace=FALSE),ncol=20)
+rownames(myNorm) = paste0("cg",sample(0:2000000,size=20,replace=FALSE))
+
+rownames(myNorm) = c("cg07881041","cg03513874", "cg05451842" ,"cg14797042" ,"cg09838562", "cg25458538", "cg09261072" ,"cg02404579", "cg04118974", "cg01236347","cg22585117" ,"cg25552317" ,"cg23875663" ,"cg07659892" ,"cg15995909" ,"cg23728960" ,"cg11993619" ,"cg01925883", "cg03452160", "cg09430819")
+colnames(myNorm) = demographics_data$Sample_Name
+
+
+# HERE YOU SPECIFY PHENOTYPE AND ADJUSTED COVARIATES. 
+# FIRST THING AFTER ~ IS PHENOTYPE TO BE COMPARED AND EVERYTHING AFTER ARE ADJUSTED COVARIATES
+# in this example we compare Sample_Group (normal vs. tumor) adjusting for race and age
+design=model.matrix(~ Sample_Group + race + age, demographics_data)
+
+fit = lmFit(myNorm, design)
+fit.e = eBayes(fit)
+IV=colnames(fit$coefficients)[2]
+
+# differentially methylated probes
+DMP = topTable(fit.e,coef=IV, adjust.method="BH",sort.by = "P", num=Inf) %>%
+              rownames_to_column("CpG")%>%
+              left_join(cpg.info,by="CpG") # adds probe info. fake data doesn't have real cpg names so NA
+```
+
